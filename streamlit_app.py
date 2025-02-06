@@ -8,6 +8,7 @@ from PIL import Image
 import tempfile
 import os
 
+# Function to preprocess the image
 def preprocess_image(image):
     """Enhances the image for better text and shape recognition."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -15,6 +16,7 @@ def preprocess_image(image):
     edged = cv2.Canny(blurred, 50, 150)
     return edged
 
+# Function to extract both text and shapes
 def extract_text_and_shapes(image):
     """Extracts both text and basic shapes from the image."""
     reader = easyocr.Reader(['en'])
@@ -26,6 +28,7 @@ def extract_text_and_shapes(image):
     
     return text_data, shape_data
 
+# Function to parse the relationships dynamically
 def parse_relationships(text_data, shape_data):
     """Dynamically identifies relationships from text and spatial positions."""
     G = nx.DiGraph()
@@ -36,6 +39,7 @@ def parse_relationships(text_data, shape_data):
     
     return G
 
+# Function to create an interactive graph using pyvis
 def create_interactive_graph(G):
     """Generates an interactive flowchart using PyVis."""
     net = Network(height='600px', width='100%', directed=True)
@@ -49,27 +53,40 @@ def create_interactive_graph(G):
     net.show(html_path)
     return html_path
 
+# Main function to tie everything together
 def main():
     st.title("📝 Handwritten Notes to Visual Flowchart")
+    
+    # File uploader
     uploaded_file = st.file_uploader("Upload an Image", type=["png", "jpg", "jpeg"])
     
     if uploaded_file:
+        # Read and display the image
         image = Image.open(uploaded_file)
         image_np = np.array(image)
         st.image(image, caption="Uploaded Image", use_column_width=True)
         
+        # Preprocess the image
         processed_img = preprocess_image(image_np)
+        
+        # Extract text and shapes from the image
         text_data, shape_data = extract_text_and_shapes(processed_img)
         
+        # Display extracted data
         st.subheader("Extracted Elements")
         st.write("Text Data:", text_data)
         st.write("Detected Shapes:", shape_data)
         
+        # Parse relationships and generate the graph
         G = parse_relationships(text_data, shape_data)
         
+        # Create an interactive graph
         st.subheader("Generated Flow Diagram")
         html_path = create_interactive_graph(G)
+        
+        # Display the generated graph
         st.components.v1.html(open(html_path, 'r').read(), height=600)
 
+# Ensure this runs when the script is executed directly
 if __name__ == "__main__":
     main()
