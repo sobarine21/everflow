@@ -1,3 +1,4 @@
 streamlit
 easyocr  
 graphviz
+pil
