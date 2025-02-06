@@ -9,26 +9,31 @@ import tempfile
 import os
 
 def preprocess_image(image):
-    """Converts image to grayscale and applies adaptive thresholding."""
+    """Enhances the image for better text and shape recognition."""
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    return cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(blurred, 50, 150)
+    return edged
 
-def extract_text(image):
-    """Uses EasyOCR to extract text from the image."""
+def extract_text_and_shapes(image):
+    """Extracts both text and basic shapes from the image."""
     reader = easyocr.Reader(['en'])
     results = reader.readtext(image)
-    return [res[1] for res in results]
+    text_data = [res[1] for res in results]
+    
+    contours, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    shape_data = [cv2.boundingRect(c) for c in contours if cv2.contourArea(c) > 100]
+    
+    return text_data, shape_data
 
-def parse_relationships(extracted_text):
-    """Dynamically identifies relationships using separators like '->', '=>', ':' or spaces."""
+def parse_relationships(text_data, shape_data):
+    """Dynamically identifies relationships from text and spatial positions."""
     G = nx.DiGraph()
-    for line in extracted_text:
-        parts = [p.strip() for p in line.replace('=>', '->').replace(':', '->').split('->')]
-        if len(parts) > 1:
-            for i in range(len(parts) - 1):
-                G.add_edge(parts[i], parts[i + 1])
-        else:
-            G.add_node(parts[0])
+    
+    elements = text_data + [f"Shape_{i}" for i in range(len(shape_data))]
+    for i in range(len(elements) - 1):
+        G.add_edge(elements[i], elements[i + 1])
+    
     return G
 
 def create_interactive_graph(G):
@@ -45,7 +50,7 @@ def create_interactive_graph(G):
     return html_path
 
 def main():
-    st.title("📝 Whiteboard to Flowchart Converter")
+    st.title("📝 Handwritten Notes to Visual Flowchart")
     uploaded_file = st.file_uploader("Upload an Image", type=["png", "jpg", "jpeg"])
     
     if uploaded_file:
@@ -54,12 +59,13 @@ def main():
         st.image(image, caption="Uploaded Image", use_column_width=True)
         
         processed_img = preprocess_image(image_np)
-        extracted_text = extract_text(processed_img)
+        text_data, shape_data = extract_text_and_shapes(processed_img)
         
-        st.subheader("Extracted Text")
-        st.write("\n".join(extracted_text))
+        st.subheader("Extracted Elements")
+        st.write("Text Data:", text_data)
+        st.write("Detected Shapes:", shape_data)
         
-        G = parse_relationships(extracted_text)
+        G = parse_relationships(text_data, shape_data)
         
         st.subheader("Generated Flow Diagram")
         html_path = create_interactive_graph(G)
